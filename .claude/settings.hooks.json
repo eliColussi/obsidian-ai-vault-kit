@@ -1,0 +1,29 @@
+{
+  "_comment": "Hook entries that power AI-to-vault auto-capture. The installer merges these into your .claude/settings.json. If you wire it by hand, add these three blocks under the existing \"hooks\" key (don't remove hooks you already have).",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/obsidian-log.py\"" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/obsidian-log.py\"" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/obsidian-log.py\"" }
+        ]
+      }
+    ]
+  }
+}

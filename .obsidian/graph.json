@@ -1,0 +1,44 @@
+{
+  "collapse-filter": false,
+  "search": "-path:.obsidian -path:node_modules -path:__pycache__",
+  "showTags": false,
+  "showAttachments": false,
+  "hideUnresolved": false,
+  "showOrphans": true,
+  "collapse-color-groups": false,
+  "colorGroups": [
+    {
+      "query": "path:MOCs OR file:Home",
+      "color": {
+        "a": 1,
+        "rgb": 16763904
+      }
+    },
+    {
+      "query": "path:Daily",
+      "color": {
+        "a": 1,
+        "rgb": 5431551
+      }
+    },
+    {
+      "query": "path:Templates",
+      "color": {
+        "a": 1,
+        "rgb": 9737364
+      }
+    }
+  ],
+  "collapse-display": false,
+  "showArrow": true,
+  "textFadeMultiplier": 0,
+  "nodeSizeMultiplier": 1.84605034722222,
+  "lineSizeMultiplier": 1.26523871527778,
+  "collapse-forces": false,
+  "centerStrength": 0.5,
+  "repelStrength": 11.8125,
+  "linkStrength": 1,
+  "linkDistance": 220,
+  "scale": 1.0451115405516758,
+  "close": false
+}
