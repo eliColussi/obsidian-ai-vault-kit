@@ -11,10 +11,16 @@ Wired to three events in .claude/settings.json:
   - UserPromptSubmit  -> logs the prompt under "## 💬 Prompts"
   - Stop              -> logs Claude's final answer as an indented "↳" reply
                          under the same section, pairing prompt + output
-  - PostToolUse       -> logs file mutations under "## 🤖 Files touched"
+  - PostToolUse       -> logs in-vault file mutations under "## 🤖 Files touched"
+                         and out-of-vault edits under "## 🌐 Touched elsewhere"
 
-Design rules (keep it lean, never noisy):
+Design rules (keep it lean, never noisy — signal only):
   - Files are DEDUPED: each file appears once per day, not once per edit.
+  - One reply per prompt: repeated Stop events update the same "↳" answer
+    instead of stacking duplicates.
+  - In-vault files become clickable [[wiki-links]]; files outside the vault
+    become clean repo-relative labels (no broken ../../ links that resolve to
+    nothing inside Obsidian).
   - IDE-injected tags (<ide_opened_file>, <ide_selection>) are stripped from
     prompts before snippetting, so editor noise never eats the real question.
   - Never block Claude. Any error -> exit 0 silently.
@@ -27,6 +33,7 @@ import sys, os, re, json, datetime
 MUTATING_TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
 PROMPTS_HEADER = "## 💬 Prompts"
 ACTIVITY_HEADER = "## 🤖 Files touched"
+EXTERNAL_HEADER = "## 🌐 Touched elsewhere"
 SNIPPET_LEN = 200
 
 # Editor/harness metadata injected ahead of the user's real words.
@@ -122,6 +129,28 @@ def append_to_section(path, header, line, dedupe_substr=None):
     write_lines(path, lines)
 
 
+def upsert_reply(path, reply_line):
+    """Keep exactly one reply per prompt. If the last entry in the Prompts
+    section is already a "↳" reply (Stop fired again with no new prompt in
+    between), replace it with the latest final answer instead of stacking
+    duplicates. Otherwise insert it under the most recent prompt."""
+    lines = read_lines(path)
+    start, end = section_bounds(lines, PROMPTS_HEADER)
+    if start is None:
+        append_to_section(path, PROMPTS_HEADER, reply_line)
+        return
+    last = next((i for i in range(end - 1, start, -1) if lines[i].strip()), None)
+    if last is not None and "↳" in lines[last]:
+        lines[last] = f"{reply_line}\n"
+        write_lines(path, lines)
+        return
+    insert_at = end
+    while insert_at - 1 > start and lines[insert_at - 1].strip() == "":
+        insert_at -= 1
+    lines.insert(insert_at, f"{reply_line}\n")
+    write_lines(path, lines)
+
+
 def last_assistant_text(transcript_path):
     """Pull the final assistant text message from a Claude Code transcript (.jsonl)."""
     last = None
@@ -147,15 +176,35 @@ def last_assistant_text(transcript_path):
     return last
 
 
-def vault_link(cwd, file_path):
+def vault_link(vault, abspath):
     """Make a wiki-link (no extension) relative to the vault root."""
     try:
-        rel = os.path.relpath(file_path, cwd)
+        rel = os.path.relpath(abspath, vault)
     except ValueError:
-        rel = file_path
+        rel = abspath
     name = os.path.splitext(os.path.basename(rel))[0]
     rel_noext = os.path.splitext(rel)[0]
     return rel_noext, f"[[{rel_noext}|{name}]]"
+
+
+def external_label(abspath):
+    """A clean, vault-independent label for a file OUTSIDE the vault:
+    '<repo-folder>/<path-in-repo>' when it sits in a git repo, otherwise a
+    home-relative (~/...) path. Never a broken wiki-link."""
+    cur = os.path.dirname(abspath)
+    root = None
+    while True:
+        if os.path.isdir(os.path.join(cur, ".git")):
+            root = cur
+            break
+        parent = os.path.dirname(cur)
+        if parent == cur:
+            break
+        cur = parent
+    if root:
+        return os.path.relpath(abspath, os.path.dirname(root))
+    home = os.path.expanduser("~")
+    return "~" + abspath[len(home):] if abspath.startswith(home) else abspath
 
 
 def main():
@@ -186,7 +235,7 @@ def main():
         if not reply:
             return
         ensure_daily(path, today)
-        append_to_section(path, PROMPTS_HEADER, f'    - ↳ {hhmm} "{snippet(reply)}"')
+        upsert_reply(path, f'    - ↳ {hhmm} "{snippet(reply)}"')
 
     elif event == "PostToolUse":
         tool = data.get("tool_name", "")
@@ -196,13 +245,20 @@ def main():
             or (data.get("tool_input") or {}).get("notebook_path")
         if not fp:
             return
-        norm = os.path.normpath(fp)
+        norm = os.path.normpath(os.path.abspath(fp))
+        vault = os.path.normpath(os.path.abspath(cwd))
+        # Never log the vault's own bookkeeping (Daily notes, Obsidian config).
         if os.sep + "Daily" + os.sep in norm or os.sep + ".obsidian" + os.sep in norm:
             return
-        rel_noext, link = vault_link(cwd, fp)
         ensure_daily(path, today)
-        # Dedupe by the file's relative path so each file appears once per day.
-        append_to_section(path, ACTIVITY_HEADER, f"- {link}", dedupe_substr=f"[[{rel_noext}|")
+        if norm == vault or norm.startswith(vault + os.sep):
+            # Inside the vault -> clickable wiki-link, deduped one per file/day.
+            rel_noext, link = vault_link(vault, norm)
+            append_to_section(path, ACTIVITY_HEADER, f"- {link}", dedupe_substr=f"[[{rel_noext}|")
+        else:
+            # Outside the vault -> clean repo-relative label, no dead wiki-link.
+            label = external_label(norm)
+            append_to_section(path, EXTERNAL_HEADER, f"- `{label}`", dedupe_substr=f"`{label}`")
 
 
 if __name__ == "__main__":
