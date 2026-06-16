@@ -1,6 +1,14 @@
 {
-  "_comment": "Hook entries that power AI-to-vault auto-capture. The installer merges these into your .claude/settings.json. If you wire it by hand, add these three blocks under the existing \"hooks\" key (don't remove hooks you already have).",
+  "_comment": "Hook entries that power AI-to-vault auto-capture + recall. The installer merges these into your .claude/settings.json. If you wire it by hand, add these four blocks under the existing \"hooks\" key (don't remove hooks you already have).",
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/obsidian-recall.py\"" }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "matcher": "",

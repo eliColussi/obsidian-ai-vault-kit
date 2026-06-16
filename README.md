@@ -21,16 +21,19 @@ the whole pitch. No plugins to buy, no sync service, no manual logging.
 
 ## What it does
 
-Three hooks bridge your Claude Code conversation into the vault:
+Four hooks bridge your Claude Code conversation into the vault:
 
 | When | What gets captured |
 |------|--------------------|
+| A session starts | Recent Daily notes are read back **into context** — last recap, open TODOs, a per-day pulse — so a blank session opens already knowing where you left off |
 | You send a prompt | The prompt is timestamped into today's Daily note (editor noise like IDE tags is stripped first) |
 | Claude finishes answering | Its final answer is logged as an indented `↳` reply under your prompt, so every prompt/answer pair is preserved |
 | Claude writes or edits a file | The file is logged as a clickable `[[wiki-link]]`, deduped to one entry per file per day |
 
 Pure-conversation turns (questions, strategy talk, decisions) get captured too,
-not just file work. That's the part most setups miss.
+not just file work. That's the part most setups miss. And because the first hook
+reads the vault back at session start, recall is automatic — you don't even have
+to ask.
 
 ## What's inside
 
@@ -41,6 +44,7 @@ not just file work. That's the part most setups miss.
 | `Templates/` | Daily, Project, Evergreen, MOC note templates |
 | `Home.md` | A starter dashboard with Maps of Content |
 | `.claude/hooks/obsidian-log.py` | The auto-capture hook (prompts, replies, file edits) |
+| `.claude/hooks/obsidian-recall.py` | The session-start recall hook (reads recent Daily notes back into context) |
 | `.claude/commands/what-did-i-do-today.md` | The end-of-day recap command |
 | `.claude/settings.hooks.json` | The hook wiring (the installer merges it for you) |
 
@@ -111,8 +115,11 @@ Daily note.
   behind, so it's invisible to Obsidian. The hooks fix that: `UserPromptSubmit`
   records what you asked, `Stop` records what Claude answered, and `PostToolUse`
   records what changed on disk.
+- **Recall runs in reverse.** `SessionStart` reads the most recent Daily notes
+  back into context when a session opens, so Claude starts already knowing where
+  you left off — automatic recall, no DB, just the markdown it already wrote.
 - **You do NOT need a PreToolUse hook.** It fires before a file exists, so it has
-  nothing to save. This kit uses exactly the three events above.
+  nothing to save. This kit uses exactly the four events above.
 
 The capture is deliberately lean: prompts and replies are clipped to one line,
 files are deduped (one line per file per day, not one per keystroke), and the
